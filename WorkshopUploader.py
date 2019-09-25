@@ -111,12 +111,11 @@ def main():
         decoded_doc = bsonjs.dumps(f.read())
         decoded_doc = decoded_doc.replace(" inf", ' "inf"')
         data = json.loads(decoded_doc)
-        #print(data.keys())
+
         parsed_data = {}
         for key in data.keys():
             print([key])
             obj = data[key]
-            #parsed_key = key
             buf = {}
             if isinstance(obj, list):
                 buf = []
@@ -124,8 +123,7 @@ def main():
             elif isinstance(obj, dict) and obj.get("Name", None) is not None:
                 data_walker(buf, data[key], 0)
             parsed_data[key] = buf
-        #t1 = json.loads(parsed_data)
-        #print(json.dumps(parsed_data, indent=4, sort_keys=False))
+
         with open(jsonresultf(), "w", encoding='utf8') as of:
             of.writelines(json.dumps(parsed_data, indent=4, sort_keys=False))
 
