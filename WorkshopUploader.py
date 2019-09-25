@@ -30,7 +30,8 @@ def parse_custom_mesh(result, obj, level):
     CustomMesh = obj["CustomMesh"]
     result["CustomMesh"] = {"MeshURL": CustomMesh.get("MeshURL", None),
                             "DiffuseURL": CustomMesh.get("DiffuseURL", None),
-                            "NormalURL": CustomMesh.get("NormalURL", None)}
+                            "NormalURL": CustomMesh.get("NormalURL", None),
+                            "ColliderURL": CustomMesh.get("ColliderURL", None)}
     # print("{0}MeshURL: {1}\n{0}DiffuseURL: {2}\n{0}NormalURL: {3}".format("\t" * (level + 2),
     #                                                                       CustomMesh.get("MeshURL", None),
     #                                                                       CustomMesh.get("DiffuseURL", None),
