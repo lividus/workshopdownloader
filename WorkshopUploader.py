@@ -1,13 +1,31 @@
+import os
 import bsonjs
 import json
 
-WORK_DIR = "./workarea/"
+WORK_DIR = ".\workarea"
+OUTPUT_DIR = "output"
 DEFAULT_NAME = "WorkshopUpload"
 
-with open(WORK_DIR+DEFAULT_NAME, 'rb') as f:
+
+def inputf():
+    return os.path.join(WORK_DIR, DEFAULT_NAME)
+
+
+def resultf():
+    fp = os.path.abspath(os.path.join(WORK_DIR, OUTPUT_DIR))
+    if not os.path.exists(fp):
+        os.makedirs(fp)
+    return os.path.join(fp, "result.txt")
+
+
+with open(inputf(), 'rb') as f:
     decoded_doc = bsonjs.dumps(f.read())
     decoded_doc = decoded_doc.replace(" inf", ' "inf"')
     data = json.loads(decoded_doc)
+
+    #with open(resultf(), 'w') as fo:
+    #    fo.writelines(json.dumps(data, indent=4, sort_keys=False))
+
     print(data.keys())
     ObjectStates = data['ObjectStates']
     for obj in ObjectStates:
