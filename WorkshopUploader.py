@@ -134,6 +134,7 @@ def save_color_diffuse(save_path, data):
 
 
 def download_and_save_url(save_path, url):
+    print("Start download url: {0}".format(url))
     file_name = "bin.part"
     name_from_server = False
     r = requests.get(url, stream=True)
@@ -142,10 +143,15 @@ def download_and_save_url(save_path, url):
 
     ContentDisposition = r.headers.get("Content-Disposition", None)
     if ContentDisposition:
-        file_name = re.findall("filename=\"(.+)\"", ContentDisposition)[0]
-        name_from_server = True
+        #file_name = re.findall("filename=\"(.+)\"", ContentDisposition)[0]
+        result = re.findall('httpswwwdropboxcoms(.+)\"', ContentDisposition)
+        if len(result) > 0:
+            file_name = result[0]
+            name_from_server = True
 
     file_path = sanitize_filepath(os.path.join(save_path, file_name))
+    if len(file_path) > 260:
+        file_path = sanitize_filepath(os.path.join(save_path, file_name[-10:]))
 
     with open(file_path, 'wb') as f:
         with tqdm(total=file_size, unit='B',
@@ -159,7 +165,7 @@ def download_and_save_url(save_path, url):
     if not name_from_server:
         ContentDisposition = r.headers.get("Content-Disposition", None)
         if ContentDisposition:
-            fnames = re.findall("filename=\"(.+)\"", ContentDisposition)
+            fnames = re.findall('httpswwwdropboxcoms(.+)\"', ContentDisposition)
             if len(fnames) > 0:
                 file_name = sanitize_filename(fnames[0])
                 new_file_path = os.path.join(save_path, file_name)
