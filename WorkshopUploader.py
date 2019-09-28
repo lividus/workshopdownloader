@@ -1,4 +1,6 @@
 import os
+import sys
+import time
 import bsonjs
 import json
 from pathvalidate import sanitize_filepath
@@ -133,74 +135,92 @@ def save_color_diffuse(save_path, data):
             json.dump(ColorDiffuse, fo, indent=4, sort_keys=False)
 
 
-def download_and_save_url(save_path, url):
-    print("Start download url: {0}".format(url))
-    file_name = "bin.part"
-    name_from_server = False
-    r = requests.get(url, stream=True)
+def get_name_from_content_disposition(fname, ContentDisposition):
+    result = re.findall('filename=\"(.+)\"', ContentDisposition)
+    if len(result) > 0:
+        result_name, result_ext = os.path.splitext(result[0])
+        return sanitize_filename(fname + result_ext)
+    return None
+
+
+def download_and_save_url(save_path, fname, url):
+    r = requests.head(url, stream=True, allow_redirects=True)
+    file_name = fname
+    ContentDisposition = r.headers.get("Content-Disposition", None)
+    name_error = False
+
+    if ContentDisposition is None:
+        name_error = True
+    else:
+        file_name = get_name_from_content_disposition(fname, ContentDisposition)
+
+    if name_error or file_name is None:
+        r = requests.get(url, stream=True, allow_redirects=True)
+        ContentDisposition = r.headers.get("Content-Disposition", None)
+        if ContentDisposition is not None:
+            file_name = get_name_from_content_disposition(file_name, ContentDisposition)
+        else:
+            print(url)
+            print("Server file name error. Use default name.")
+            print(r.headers)
+            file_name += ".bin"
+
+    r = requests.get(url, stream=True, allow_redirects=True)
     file_size = int(r.headers.get('content-length', 0))
     initial_pos = 0
 
-    ContentDisposition = r.headers.get("Content-Disposition", None)
-    if ContentDisposition:
-        #file_name = re.findall("filename=\"(.+)\"", ContentDisposition)[0]
-        result = re.findall('httpswwwdropboxcoms(.+)\"', ContentDisposition)
-        if len(result) > 0:
-            file_name = result[0]
-            name_from_server = True
-
     file_path = sanitize_filepath(os.path.join(save_path, file_name))
-    if len(file_path) > 260:
-        file_path = sanitize_filepath(os.path.join(save_path, file_name[-10:]))
+    #if len(file_path) > 260:
+    #    file_path = '\\\\?\\' + file_path
 
-    with open(file_path, 'wb') as f:
-        with tqdm(total=file_size, unit='B',
-                  unit_scale=True, unit_divisor=1024,
-                  desc=file_name, initial=initial_pos,
-                  ascii=True, miniters=1) as pbar:
-            for chunk in r.iter_content(32 * 1024):
-                f.write(chunk)
-                pbar.update(len(chunk))
+    print("Start download url: {0} To: {1}".format(url, file_name))
 
-    if not name_from_server:
-        ContentDisposition = r.headers.get("Content-Disposition", None)
-        if ContentDisposition:
-            fnames = re.findall('httpswwwdropboxcoms(.+)\"', ContentDisposition)
-            if len(fnames) > 0:
-                file_name = sanitize_filename(fnames[0])
-                new_file_path = os.path.join(save_path, file_name)
-                os.rename(file_path, new_file_path)
+    try:
+        with open(file_path, 'wb') as f:
+            with tqdm(total=file_size, unit='B',
+                      unit_scale=True, unit_divisor=1024,
+                      desc=file_name, initial=initial_pos,
+                      ascii=True, miniters=1,
+                      file=sys.stdout) as pbar:
+                for chunk in r.iter_content(32 * 1024):
+                    f.write(chunk)
+                    pbar.update(len(chunk))
+    except IOError as ioe:
+        print(ioe)
+        quit()
+
+    print("\n")
 
 
-def download_and_save_custom_image(save_path, data):
+def download_and_save_custom_image(save_path, file_name, data):
     CustomImage = data.get("CustomImage", None)
     if CustomImage is not None:
         ImageURL = CustomImage.get("ImageURL", None)
         if ImageURL is not None and len(ImageURL) > 0:
-            download_and_save_url(save_path, ImageURL)
+            download_and_save_url(save_path, file_name, ImageURL)
         ImageSecondaryURL = CustomImage.get("ImageSecondaryURL", None)
         if ImageSecondaryURL is not None and len(ImageSecondaryURL) > 0:
-            download_and_save_url(save_path, ImageSecondaryURL)
+            download_and_save_url(save_path, file_name, ImageSecondaryURL)
 
 
-def download_and_save_custom_mesh(save_path, data):
+def download_and_save_custom_mesh(save_path, file_name, data):
     CustomMesh = data.get("CustomMesh", None)
     if CustomMesh is not None:
         MeshURL = CustomMesh.get("MeshURL", None)
         if MeshURL is not None and len(MeshURL) > 0:
-            download_and_save_url(save_path, MeshURL)
+            download_and_save_url(save_path, file_name, MeshURL)
         DiffuseURL = CustomMesh.get("DiffuseURL", None)
         if DiffuseURL is not None and len(DiffuseURL) > 0:
-            download_and_save_url(save_path, DiffuseURL)
+            download_and_save_url(save_path, file_name, DiffuseURL)
         NormalURL = CustomMesh.get("NormalURL", None)
         if NormalURL is not None and len(NormalURL) > 0:
-            download_and_save_url(save_path, NormalURL)
+            download_and_save_url(save_path, file_name, NormalURL)
         ColliderURL = CustomMesh.get("ColliderURL", None)
         if ColliderURL is not None and len(ColliderURL) > 0:
-            download_and_save_url(save_path, ColliderURL)
+            download_and_save_url(save_path, file_name, ColliderURL)
 
 
-def download_and_save_custom_deck(save_path, data):
+def download_and_save_custom_deck(save_path, file_name, data):
     CustomDeck = data.get("CustomDeck", None)
     if CustomDeck is not None:
         for key in CustomDeck.keys():
@@ -208,10 +228,10 @@ def download_and_save_custom_deck(save_path, data):
             key_data = CustomDeck[key]
             FaceURL = key_data.get("FaceURL", None)
             if FaceURL is not None and len(FaceURL) > 0:
-                download_and_save_url(deck_path, FaceURL)
+                download_and_save_url(deck_path, file_name, FaceURL)
             BackURL = key_data.get("BackURL", None)
             if BackURL is not None and len(BackURL) > 0:
-                download_and_save_url(deck_path, BackURL)
+                download_and_save_url(deck_path, file_name, BackURL)
 
 
 def process_dirs(key_path, data):
@@ -222,9 +242,9 @@ def process_dirs(key_path, data):
         obj_name = "{0} {1} ({2})".format(data.get("Name", ""), data.get("Nickname", ""), data.get("GUID", ""))
         fp = build_path(key_path, obj_name)
         save_color_diffuse(fp, data)
-        download_and_save_custom_image(fp, data)
-        download_and_save_custom_mesh(fp, data)
-        download_and_save_custom_deck(fp, data)
+        download_and_save_custom_image(fp, obj_name, data)
+        download_and_save_custom_mesh(fp, obj_name, data)
+        download_and_save_custom_deck(fp, obj_name, data)
         ContainedObjects = data.get("ContainedObjects", [])
         for obj in ContainedObjects:
             process_dirs(fp, obj)
