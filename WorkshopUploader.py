@@ -8,6 +8,7 @@ from pathvalidate import sanitize_filename
 from tqdm import tqdm
 import requests
 import re
+from urllib.parse import urlparse
 
 WORK_DIR = r".\workarea"
 OUTPUT_DIR = "output"
@@ -144,26 +145,30 @@ def get_name_from_content_disposition(fname, ContentDisposition):
 
 
 def download_and_save_url(save_path, fname, url):
-    r = requests.head(url, stream=True, allow_redirects=True)
-    file_name = fname
-    ContentDisposition = r.headers.get("Content-Disposition", None)
-    name_error = False
-
-    if ContentDisposition is None:
-        name_error = True
+    url_parse = os.path.splitext(urlparse(url).path)[1]
+    if len(url_parse) > 0:
+        file_name = fname+url_parse
     else:
-        file_name = get_name_from_content_disposition(fname, ContentDisposition)
-
-    if name_error or file_name is None:
-        r = requests.get(url, stream=True, allow_redirects=True)
+        r = requests.head(url, stream=True, allow_redirects=True)
+        file_name = fname
         ContentDisposition = r.headers.get("Content-Disposition", None)
-        if ContentDisposition is not None:
-            file_name = get_name_from_content_disposition(file_name, ContentDisposition)
+        name_error = False
+
+        if ContentDisposition is None:
+            name_error = True
         else:
-            print(url)
-            print("Server file name error. Use default name.")
-            print(r.headers)
-            file_name += ".bin"
+            file_name = get_name_from_content_disposition(fname, ContentDisposition)
+
+        if name_error or file_name is None:
+            r = requests.get(url, stream=True, allow_redirects=True)
+            ContentDisposition = r.headers.get("Content-Disposition", None)
+            if ContentDisposition is not None:
+                file_name = get_name_from_content_disposition(file_name, ContentDisposition)
+            else:
+                print(url)
+                print("Server file name error. Use default name.")
+                print(r.headers)
+                file_name += ".bin"
 
     r = requests.get(url, stream=True, allow_redirects=True)
     file_size = int(r.headers.get('content-length', 0))
@@ -172,6 +177,7 @@ def download_and_save_url(save_path, fname, url):
     file_path = sanitize_filepath(os.path.join(save_path, file_name))
     #if len(file_path) > 260:
     #    file_path = '\\\\?\\' + file_path
+    #TODO: add check file exists.
 
     print("Start download url: {0} To: {1}".format(url, file_name))
 
@@ -239,7 +245,15 @@ def process_dirs(key_path, data):
         for obj in data:
             process_dirs(key_path, obj)
     elif isinstance(data, dict):
-        obj_name = "{0} {1} ({2})".format(data.get("Name", ""), data.get("Nickname", ""), data.get("GUID", ""))
+        # obj_name = data.get("Nickname", "")
+        # ObjName = data.get("Name", "")
+        # if len(obj_name) == 0 and len(ObjName) > 0:
+        #     obj_name = ObjName
+        # GUID = data.get("GUID", "")
+        # if len(obj_name) == 0 and len(GUID) > 0:
+        #     obj_name = GUID
+
+        obj_name = "{0} {1}".format(data.get("Nickname", ""), data.get("GUID", ""))
         fp = build_path(key_path, obj_name)
         save_color_diffuse(fp, data)
         download_and_save_custom_image(fp, obj_name, data)
@@ -263,7 +277,11 @@ def download_files(data):
 def main():
     with open(inputf(), 'rb') as f:
         decoded_doc = bsonjs.dumps(f.read())
-        decoded_doc = decoded_doc.replace(" inf", ' "inf"')
+        decoded_doc = decoded_doc.replace(" inf ", ' "inf" ').replace(" inf,", ' "inf",')
+
+        with open(resultf(), "w", encoding='utf8') as of:
+            of.writelines(decoded_doc)
+
         data = json.loads(decoded_doc)
 
         parsed_data = {}
